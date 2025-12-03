@@ -1,0 +1,105 @@
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+import aiohttp
+
+# --- CONFIGURATION ---
+API_TOKEN = "8340062727:AAFv5owhw2J_VHSC9aDfuOdcjXOdipyfcFM"
+ALLOWED_GROUP_ID = -1002752217221
+VIP_USER_ID = 6853944247
+
+# Logging setup (যাতে এরর দেখা যায়)
+logging.basicConfig(level=logging.INFO)
+
+bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+dp = Dispatcher()
+
+# --- BUTTONS ---
+def join_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Join Channel", url="https://t.me/jexarofficial")]
+    ])
+
+# --- API FUNCTION ---
+async def fetch_json(url):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as r:
+                if r.status == 200:
+                    return await r.json()
+    except Exception as e:
+        print(f"API Error: {e}")
+    return None
+
+# --- START COMMAND ---
+@dp.message(Command("start"))
+async def start_handler(msg: Message):
+    if msg.chat.id != ALLOWED_GROUP_ID:
+        await msg.reply(f"❌ This bot only works in the authorized group.\nGroup ID: {ALLOWED_GROUP_ID}")
+        return
+    await msg.reply("✅ Bot is Online and Ready!\nUse: /like bd <uid>")
+
+# --- LIKE COMMAND ---
+@dp.message(Command("like"))
+async def like_handler(msg: Message):
+    # ১. গ্রুপ চেক করা
+    if msg.chat.id != ALLOWED_GROUP_ID:
+        await msg.reply("❌ এই কমান্ডটি শুধুমাত্র আমাদের অফিসিয়াল গ্রুপে কাজ করবে।", reply_markup=join_keyboard())
+        return
+
+    parts = msg.text.split()
+    
+    # ২. ইনপুট ফরম্যাট চেক
+    if len(parts) != 3:
+        await msg.reply("❗ ভুল নিয়ম। সঠিক নিয়ম:\n<code>/like bd 1234567890</code>", reply_markup=join_keyboard())
+        return
+
+    region, uid = parts[1].upper(), parts[2]
+
+    # ৩. রিজিয়ন চেক
+    if region not in ["BD", "IND"]:
+        await msg.reply("❗ শুধুমাত্র BD অথবা IND সার্ভার সাপোর্ট করে।")
+        return
+
+    wait_msg = await msg.reply("⏳ Connecting to server... Please wait.")
+
+    # ৪. API কল করা
+    # দ্রষ্টব্য: এই API যদি কাজ না করে, তবে বটের কিছু করার নেই।
+    url = f"https://anish-likes.vercel.app/like?server_name={region.lower()}&uid={uid}&key=jex4rrr"
+    
+    data = await fetch_json(url)
+
+    if not data:
+        await wait_msg.edit_text("❌ Server Error: API কাজ করছে না অথবা রেসপন্স দিচ্ছে না।")
+        return
+
+    # ৫. রেসপন্স হ্যান্ডলিং
+    if data.get("status") == 2:
+        await wait_msg.edit_text(
+            f"🚫 <b>Daily Limit Reached!</b>\n"
+            f"UID: <code>{uid}</code>\n"
+            f"Name: {data.get('PlayerNickname', 'Unknown')}\n"
+            f"আজকের মত লাইক শেষ। কাল আবার চেষ্টা করুন।"
+        )
+    else:
+        await wait_msg.edit_text(
+            f"✅ <b>Likes Sent Successfully!</b>\n\n"
+            f"👤 <b>Name:</b> {data.get('PlayerNickname', 'N/A')}\n"
+            f"🆔 <b>UID:</b> <code>{uid}</code>\n"
+            f"❤️ <b>Likes Given:</b> {data.get('LikesGivenByAPI', 'N/A')}\n"
+            f"📊 <b>Total Likes:</b> {data.get('LikesafterCommand', 'N/A')}\n\n"
+            f"🤖 <b>Powered By JEX AI</b>",
+            reply_markup=join_keyboard()
+        )
+
+# --- RUN BOT ---
+async def main():
+    print("🤖 Bot is running...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
