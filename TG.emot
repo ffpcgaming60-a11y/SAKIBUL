@@ -1,0 +1,399 @@
+import logging
+import random
+import requests
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
+
+# Enable logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Bot Configuration
+BOT_TOKEN = "8340062727:AAFv5owhw2J_VHSC9aDfuOdcjXOdipyfcFM"
+API_URL = "https://god-emote-bot-api.vercel.app/play_emote"
+CHANNEL_URL = "https://t.me/+lN2xb-LBYPtjZTk1"
+CREATOR_URL = "https://t.me/XCLUSIVEJEXAR"
+WEBSITE_URL = "https://godjexaremoteweb.vercel.app/"
+
+# Emote IDs Database
+EMOTE_IDS = {
+    "909049010": "EVO P90",
+    "909051003": "EVO M60 (NEW)", 
+    "909033002": "EVO MP5",
+    "909041005": "EVO GROZA",
+    "909038010": "EVO THOMPSON",
+    "909039011": "EVO M10 (RED)",
+    "909040010": "EVO MP40 (BLUE)",
+    "909000081": "EVO M10 (GREEN)",
+    "909000085": "EVO XM8",
+    "909000063": "EVO AK",
+    "909000075": "EVO MP40",
+    "909033001": "EVO M4A1",
+    "909000090": "EVO FAMAS",
+    "909000068": "EVO SCAR",
+    "909000098": "EVO UMP",
+    "909035007": "EVO M18",
+    "909037011": "EVO FIST",
+    "909038012": "EVO G18",
+    "909035012": "EVO AN94",
+    "909042008": "EVO WOODPECKER"
+}
+
+async def start(update: Update, context: CallbackContext) -> None:
+    """Send welcome message when command /start is issued."""
+    try:
+        user = update.effective_user
+        welcome_text = f"""
+🎮 Welcome {user.first_name} to EVO Emote Bot! 🎮
+
+⚡ Premium EVO Emote Player for Gaming Fun ⚡
+
+📋 Available Commands:
+✨ /evo_play region teamcode uid - Play random EVO emote
+🎯 /play region teamcode uid emote_id - Play specific emote
+📖 /get - Get all emote IDs list
+
+🔧 Example Usage:
+/evo_play ind 8650103 6456291133
+/play ind 8650103 6456291133 909000081
+
+🚀 Experience the ultimate emote gaming experience!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+        """
+        
+        # Create inline keyboard
+        keyboard = [
+            [InlineKeyboardButton("📢 Join Channel", url=CHANNEL_URL)],
+            [InlineKeyboardButton("👨‍💻 Creator", url=CREATOR_URL)]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+        logger.info("Start command executed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error in start command: {e}")
+        await update.message.reply_text("❌ Sorry, something went wrong! Please try again.")
+
+async def evo_play(update: Update, context: CallbackContext) -> None:
+    """Handle /evo_play command with random emote selection."""
+    try:
+        if len(context.args) != 3:
+            error_text = """
+❌ Oops! Wrong format bro! ❌
+
+📝 Correct way to use:
+/evo_play region teamcode uid
+
+🎯 Example:
+/evo_play ind 8650103 6456291133
+
+💡 Make sure you provide all three parameters!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+            """
+            await update.message.reply_text(error_text)
+            return
+
+        region, team_code, uid = context.args
+        
+        # Show processing message with human-like text
+        processing_msg = await update.message.reply_text(
+            "🔄 Processing your request...\n\nHang tight while I activate that emote for you! ✨"
+        )
+        
+        # Add small delay for natural feel
+        await asyncio.sleep(1.5)
+        
+        # Select random emote
+        emote_id, emote_name = random.choice(list(EMOTE_IDS.items()))
+        
+        try:
+            # Prepare API request
+            params = {
+                'region': region,
+                'teamcode': team_code,
+                'uid': uid,
+                'uid2': '987654321',  # Default second UID
+                'emote': emote_id
+            }
+            
+            # Send request to API
+            response = requests.get(API_URL, params=params, timeout=10)
+            data = response.json()
+            
+            # Edit processing message with result (human-like response)
+            if data.get('status') == 'success':
+                success_text = f"""
+🎉 Boom! Emote Activated Successfully! 🎉
+
+🆔 Emote ID: {emote_id}
+🎮 Emote Name: {emote_name}
+🌍 Region: {region}
+🏷 Team Code: {team_code}
+👥 Target UID: {uid}
+⚡ Status: {data.get('message', 'Success')}
+
+🎊 Random EVO emote is live now! Enjoy the show! 🎊
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+                """
+                await processing_msg.edit_text(success_text)
+            else:
+                error_text = f"""
+❌ Damn! Something went wrong ❌
+
+📛 Error: {data.get('message', 'Unknown error')}
+🆔 Selected Emote: {emote_name} ({emote_id})
+
+🔧 Check your parameters and try again bro!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+                """
+                await processing_msg.edit_text(error_text)
+                
+        except Exception as e:
+            error_text = f"""
+🚨 Oops! API is not responding 🚨
+
+📛 Error: {str(e)}
+🆔 Selected Emote: {emote_name} ({emote_id})
+
+🔧 Try again in a few moments!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+            """
+            await processing_msg.edit_text(error_text)
+            
+    except Exception as e:
+        logger.error(f"Error in evo_play command: {e}")
+        await update.message.reply_text("❌ Sorry, something went wrong with the command!")
+
+async def play(update: Update, context: CallbackContext) -> None:
+    """Handle /play command with specific emote ID."""
+    try:
+        if len(context.args) != 4:
+            error_text = """
+❌ Bro, wrong format! ❌
+
+📝 Correct way to use:
+/play region teamcode uid emote_id
+
+🎯 Example:
+/play ind 8650103 6456291133 909000081
+
+💡 All four parameters are required!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+            """
+            await update.message.reply_text(error_text)
+            return
+
+        region, team_code, uid, emote_id = context.args
+        
+        # Validate emote ID
+        if emote_id not in EMOTE_IDS:
+            error_text = f"""
+❌ Invalid Emote ID bro! ❌
+
+🆔 You entered: {emote_id}
+📖 Check available IDs using: /get
+
+🔍 That emote ID doesn't exist in our database!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+            """
+            await update.message.reply_text(error_text)
+            return
+        
+        emote_name = EMOTE_IDS[emote_id]
+        
+        # Show processing message with human-like text
+        processing_msg = await update.message.reply_text(
+            f"🔄 Activating {emote_name}...\n\nGetting everything ready for your epic emote moment! 🚀"
+        )
+        
+        # Add small delay for natural feel
+        await asyncio.sleep(1.5)
+        
+        try:
+            # Prepare API request
+            params = {
+                'region': region,
+                'teamcode': team_code,
+                'uid': uid,
+                'uid2': '987654321',  # Default second UID
+                'emote': emote_id
+            }
+            
+            # Send request to API
+            response = requests.get(API_URL, params=params, timeout=10)
+            data = response.json()
+            
+            # Edit processing message with result
+            if data.get('status') == 'success':
+                success_text = f"""
+🎉 Yes! Emote Activated Perfectly! 🎉
+
+🆔 Emote ID: {emote_id}
+🎮 Emote Name: {emote_name}
+🌍 Region: {region}
+🏷 Team Code: {team_code}
+👥 Target UID: {uid}
+⚡ Status: {data.get('message', 'Success')}
+
+🎯 Your chosen EVO emote is now live! Looking fresh! 🎯
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+                """
+                await processing_msg.edit_text(success_text)
+            else:
+                error_text = f"""
+❌ Failed to activate emote ❌
+
+📛 Error: {data.get('message', 'Unknown error')}
+🆔 Selected Emote: {emote_name} ({emote_id})
+
+🔧 Double-check your details and try again!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+                """
+                await processing_msg.edit_text(error_text)
+                
+        except Exception as e:
+            error_text = f"""
+🚨 API connection failed 🚨
+
+📛 Error: {str(e)}
+🆔 Selected Emote: {emote_name} ({emote_id})
+
+🔧 Server might be busy, try again later!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+            """
+            await processing_msg.edit_text(error_text)
+            
+    except Exception as e:
+        logger.error(f"Error in play command: {e}")
+        await update.message.reply_text("❌ Sorry, something went wrong with the command!")
+
+async def get_emotes(update: Update, context: CallbackContext) -> None:
+    """Handle /get command to show all available emote IDs."""
+    try:
+        # Show processing message
+        processing_msg = await update.message.reply_text(
+            "📖 Fetching all available emotes...\n\nGetting the complete list ready for you! 🔥"
+        )
+        
+        await asyncio.sleep(1)
+        
+        # Build the emote list
+        emote_list = "🎮 All Available EVO Emotes:\n\n"
+        
+        # Add all emote IDs with better formatting
+        for i, (emote_id, name) in enumerate(EMOTE_IDS.items(), 1):
+            emote_list += f"{i}. {emote_id} - {name}\n"
+        
+        get_text = f"""
+📖 EVO Emote IDs Master List 📖
+
+{emote_list}
+🌐 Complete Web List:
+{WEBSITE_URL}
+
+💡 Pro Tip: Use these IDs with /play command!
+🎲 Feeling lucky? Try /evo_play for random emote fun!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+        """
+        
+        # Edit the processing message with final result
+        await processing_msg.edit_text(get_text)
+        
+    except Exception as e:
+        logger.error(f"Error in get command: {e}")
+        await update.message.reply_text("❌ Sorry, couldn't fetch the emote list!")
+
+async def help_command(update: Update, context: CallbackContext) -> None:
+    """Send a message when the command /help is issued."""
+    try:
+        help_text = """
+🆘 Need Help? Here's Everything You Need! 🆘
+
+📋 Available Commands:
+
+🎲 /evo_play region teamcode uid 
+   - Play a random EVO emote (Surprise!)
+   - Example: /evo_play ind 8650103 6456291133
+
+🎯 /play region teamcode uid emote_id 
+   - Play specific emote by ID (Your Choice!)
+   - Example: /play ind 8650103 6456291133 909000081
+
+📖 /get 
+   - Get complete list of all emote IDs
+
+🏠 /start 
+   - Show welcome message and bot info
+
+🔧 Parameters Explained:
+• region - Your game region (e.g., ind)
+• teamcode - Your team code 
+• uid - Your user ID
+• emote_id - Specific emote ID from our list
+
+🚀 Ready to rock those emotes? Let's go!
+
+👨‍💻 CREDIT: @XCLUSIVEJEXAR
+        """
+        await update.message.reply_text(help_text)
+        
+    except Exception as e:
+        logger.error(f"Error in help command: {e}")
+        await update.message.reply_text("❌ Sorry, couldn't display help!")
+
+async def handle_message(update: Update, context: CallbackContext) -> None:
+    """Handle any message that is not a command."""
+    try:
+        await update.message.reply_text(
+            "🤖 I'm EVO Emote Bot!\n\n"
+            "Use /start to begin\n"
+            "Use /help for commands list\n"
+            "Use /get for emote IDs\n\n"
+            "👨‍💻 CREDIT: @XCLUSIVEJEXAR"
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_message: {e}")
+
+def main() -> None:
+    """Start the bot."""
+    try:
+        # Create the Application
+        application = Application.builder().token(BOT_TOKEN).build()
+
+        # Add command handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("evo_play", evo_play))
+        application.add_handler(CommandHandler("play", play))
+        application.add_handler(CommandHandler("get", get_emotes))
+        application.add_handler(CommandHandler("help", help_command))
+        
+        # Add message handler for non-command messages
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+        # Start the Bot
+        print("🤖 EVO Emote Bot is starting...")
+        application.run_polling()
+        print("🤖 EVO Emote Bot is now running...")
+        
+    except Exception as e:
+        logger.error(f"Bot startup error: {e}")
+        print(f"❌ Bot failed to start: {e}")
+
+if __name__ == '__main__':
+    main()
